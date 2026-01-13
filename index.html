@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+    <title>Hiboux Funky</title>
+    <style>
+        :root { --bg: #121212; --card: #1e1e1e; --accent: #007aff; --text: #ffffff; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+        
+        .container { width: 100%; max-width: 400px; text-align: center; padding-bottom: 40px; }
+        h1 { font-weight: 200; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 30px; font-size: 1.5rem; }
+        
+        .card { background: var(--card); padding: 20px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        
+        /* Boutons */
+        .btn { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 15px; width: 100%; font-weight: 600; font-size: 16px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-grey { background: #3a3a3c; }
+        
+        /* Sliders */
+        input[type="range"] { width: 100%; -webkit-appearance: none; background: #333; height: 8px; border-radius: 4px; margin: 20px 0; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: white; border-radius: 50%; box-shadow: 0 2px 10px black; }
+
+        /* Grille Couleurs Rapides */
+        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 15px; }
+        .dot { height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); cursor: pointer; }
+
+        /* Select Effets */
+        select { width: 100%; padding: 15px; border-radius: 15px; background: #3a3a3c; color: white; border: none; font-size: 16px; margin-top: 10px; -webkit-appearance: none; text-align: center; }
+
+        /* Lien partagé */
+        .link-box { background: rgba(0,0,0,0.4); padding: 15px; border-radius: 15px; font-size: 12px; color: #888; word-break: break-all; margin-top: 10px; }
+        .hidden { display: none !important; }
+        
+        /* Centrage de la roue */
+        #color-wheel { display: flex; justify-content: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Hiboux Funky</h1>
+
+        <div id="no-bt" class="card hidden">
+            <p style="color:#aaa; margin-bottom:20px;">Bluetooth non supporté par ce navigateur.<br>Sur iPhone, utilisez <b>Bluefy</b>.</p>
+            <div class="link-box" id="linkText">...</div>
+            <button class="btn btn-grey" onclick="copyLink()">Copier le lien</button>
+        </div>
+
+        <div id="app" class="hidden">
+            <button id="connectBtn" class="btn" style="background:#34c759;">Connecter la Lampe 🔌</button>
+
+            <div class="card">
+                <button id="pwrBtn" class="btn btn-grey">Allumer / Éteindre</button>
+                
+                <div id="color-wheel"></div>
+                
+                <input type="range" id="bri" min="10" max="255" value="150">
+
+                <div class="grid">
+                    <div class="dot" style="background:red" onclick="setPreset(0)"></div>
+                    <div class="dot" style="background:#00ff00" onclick="setPreset(1)"></div>
+                    <div class="dot" style="background:cyan" onclick="setPreset(2)"></div>
+                    <div class="dot" style="background:yellow" onclick="setPreset(3)"></div>
+                    <div class="dot" style="background:purple" onclick="setPreset(4)"></div>
+                    <div class="dot" style="background:blue" onclick="setPreset(5)"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <label style="color:#888; font-size:12px; letter-spacing:1px;">AMBIANCE</label>
+                <select id="fxSelect">
+                    <option value="0">Statique (Couleur)</option>
+                    <option value="2">🌈 Arc-en-ciel</option>
+                    <option value="3">💓 Respiration</option>
+                    <option value="4">🔥 Feu de cheminée</option>
+                </select>
+            </div>
+            
+            <div class="link-box" id="shareLink" onclick="copyLink()">Appuyez ici pour copier le lien</div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURATION
+        const SRV_UUID = "6e400008-b5a3-f393-e0a9-e50e24dcca9e";
+        const CHR_UUID = "6e400009-b5a3-f393-e0a9-e50e24dcca9e";
+        let device, char, isOn = true;
+
+        // Mise à jour des liens
+        document.getElementById('linkText').innerText = window.location.href;
+        document.getElementById('shareLink').innerText = window.location.href;
+
+        // Affichage selon le navigateur
+        if(navigator.bluetooth) document.getElementById('app').classList.remove('hidden');
+        else document.getElementById('no-bt').classList.remove('hidden');
+
+        // Initialisation de la Roue Iro.js
+        var colorPicker = new iro.ColorPicker("#color-wheel", {
+            width: 280,
+            color: "#fff",
+            borderWidth: 2,
+            borderColor: "#fff",
+            layout: [
+                { component: iro.ui.Wheel, options: {} },
+            ]
+        });
+
+        // Envoi de la couleur quand on change la roue (Throttled pour pas spammer le BT)
+        let lastSend = 0;
+        colorPicker.on('color:change', function(color) {
+            const now = Date.now();
+            if(now - lastSend > 100) { // Max 10 envois par seconde
+                send([88, color.rgb.r, color.rgb.g, color.rgb.b]); // 88 = 'X'
+                lastSend = now;
+            }
+        });
+
+        // CONNEXION BLUETOOTH
+        async function connect() {
+            try {
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Hiboux_Funky' }],
+                    optionalServices: [SRV_UUID]
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SRV_UUID);
+                char = await service.getCharacteristic(CHR_UUID);
+                
+                const btn = document.getElementById('connectBtn');
+                btn.innerText = "Connecté ✅";
+                btn.style.background = "#1e1e1e";
+                btn.style.border = "1px solid #333";
+            } catch(e) { console.log(e); }
+        }
+
+        async function send(data) {
+            if(!char) return;
+            try { await char.writeValue(new Uint8Array(data)); } catch(e){}
+        }
+
+        // EVENTS
+        document.getElementById('connectBtn').onclick = connect;
+        
+        document.getElementById('pwrBtn').onclick = () => {
+            isOn = !isOn;
+            send([80, isOn ? 1 : 0]); // 80 = 'P'
+            document.getElementById('pwrBtn').style.background = isOn ? "#3a3a3c" : "#ff3b30";
+        };
+
+        document.getElementById('bri').oninput = (e) => {
+            send([66, parseInt(e.target.value)]); // 66 = 'B'
+        };
+
+        document.getElementById('fxSelect').onchange = (e) => {
+            send([69, parseInt(e.target.value)]); // 69 = 'E'
+        };
+
+        function setPreset(idx) {
+            send([67, idx]); // 67 = 'C'
+        }
+
+        function copyLink() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Lien copié !");
+        }
+    </script>
+</body>
+</html>
