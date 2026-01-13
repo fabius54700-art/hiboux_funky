@@ -8,50 +8,40 @@
     <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
     <title>Hiboux Funky</title>
     <style>
-        :root { --bg: #121212; --card: #1e1e1e; --accent: #007aff; --text: #ffffff; }
+        :root { --bg: #121212; --card: #1e1e1e; --accent: #007aff; --text: #ffffff; --success: #34c759; }
         body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
-        
         .container { width: 100%; max-width: 400px; text-align: center; padding-bottom: 40px; }
-        h1 { font-weight: 200; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 30px; font-size: 1.5rem; }
-        
+        h1 { font-weight: 200; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px; font-size: 1.5rem; }
         .card { background: var(--card); padding: 20px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
-        
         .btn { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 15px; width: 100%; font-weight: 600; font-size: 16px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
         .btn:active { transform: scale(0.98); opacity: 0.9; }
         .btn-grey { background: #3a3a3c; }
-        
         input[type="range"] { width: 100%; -webkit-appearance: none; background: #333; height: 8px; border-radius: 4px; margin: 20px 0; outline: none; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: white; border-radius: 50%; box-shadow: 0 2px 10px black; }
-
         .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 15px; }
         .dot { height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); cursor: pointer; }
-
         select { width: 100%; padding: 15px; border-radius: 15px; background: #3a3a3c; color: white; border: none; font-size: 16px; margin-top: 10px; -webkit-appearance: none; text-align: center; }
-
-        .link-box { 
-            display: block; 
-            background: rgba(0,0,0,0.4); 
-            padding: 15px; 
-            border-radius: 15px; 
-            font-size: 12px; 
-            color: #888; 
-            word-break: break-all; 
-            margin-top: 10px; 
-            text-decoration: none; 
-            border: 1px solid transparent;
-            transition: 0.2s;
-        }
+        .link-box { display: block; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 15px; font-size: 12px; color: #888; word-break: break-all; margin-top: 10px; text-decoration: none; border: 1px solid transparent; transition: 0.2s; }
         .link-box:active { background: rgba(255,255,255,0.1); border-color: #555; }
-        
         .hint-text { color: #555; font-size: 11px; margin-top: 8px; font-weight: 500; }
         .hidden { display: none !important; }
         #color-wheel { display: flex; justify-content: center; margin: 20px 0; }
+        
+        /* Jauge Batterie */
+        .batt-container { display: flex; justify-content: center; align-items: center; margin-bottom: 25px; color: #888; font-size: 13px; }
+        .batt-icon { width: 30px; height: 14px; border: 2px solid #666; border-radius: 4px; position: relative; margin-left: 8px; padding: 2px; }
+        .batt-icon::after { content: ''; position: absolute; right: -5px; top: 3px; width: 3px; height: 8px; background: #666; border-radius: 0 2px 2px 0; }
+        .batt-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.5s; border-radius: 1px; }
     </style>
 </head>
 <body>
-
     <div class="container">
         <h1>Hiboux Funky</h1>
+        
+        <div id="batt-display" class="batt-container hidden">
+            <span id="batt-text">--%</span>
+            <div class="batt-icon"><div id="batt-fill" class="batt-fill"></div></div>
+        </div>
 
         <div id="no-bt" class="card hidden">
             <p style="color:#aaa; margin-bottom:20px;">Bluetooth non supporté.<br>Sur iPhone, utilisez <b>Bluefy</b>.</p>
@@ -66,7 +56,6 @@
                 <button id="pwrBtn" class="btn btn-grey">Allumer / Éteindre</button>
                 <div id="color-wheel"></div>
                 <input type="range" id="bri" min="10" max="255" value="150">
-
                 <div class="grid">
                     <div class="dot" style="background:red" onclick="setPreset(0)"></div>
                     <div class="dot" style="background:#00ff00" onclick="setPreset(1)"></div>
@@ -97,17 +86,14 @@
 
     <script>
         const SRV_UUID = "6e400008-b5a3-f393-e0a9-e50e24dcca9e";
-        const CHR_UUID = "6e400009-b5a3-f393-e0a9-e50e24dcca9e";
-        let device, char, isOn = true;
+        const CHR_UUID = "6e400009-b5a3-f393-e0a9-e50e24dcca9e"; // Commande
+        const BAT_UUID = "6e400010-b5a3-f393-e0a9-e50e24dcca9e"; // Batterie
+        let device, char, battChar, isOn = true;
 
         const currentUrl = window.location.href;
         const linkEl = document.getElementById('shareLink');
         const linkErr = document.getElementById('linkTextErr');
-        
-        [linkEl, linkErr].forEach(el => {
-            el.innerText = currentUrl;
-            el.href = currentUrl;
-        });
+        [linkEl, linkErr].forEach(el => { el.innerText = currentUrl; el.href = currentUrl; });
 
         if(navigator.bluetooth) document.getElementById('app').classList.remove('hidden');
         else document.getElementById('no-bt').classList.remove('hidden');
@@ -117,10 +103,7 @@
         let lastSend = 0;
         colorPicker.on('color:change', function(color) {
             const now = Date.now();
-            if(now - lastSend > 100) { 
-                send([88, color.rgb.r, color.rgb.g, color.rgb.b]); 
-                lastSend = now;
-            }
+            if(now - lastSend > 100) { send([88, color.rgb.r, color.rgb.g, color.rgb.b]); lastSend = now; }
         });
 
         async function connect() {
@@ -129,11 +112,36 @@
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SRV_UUID);
                 char = await service.getCharacteristic(CHR_UUID);
+                
+                // Connexion Batterie
+                try {
+                    battChar = await service.getCharacteristic(BAT_UUID);
+                    await battChar.startNotifications();
+                    battChar.addEventListener('characteristicvaluechanged', handleBattery);
+                    document.getElementById('batt-display').classList.remove('hidden');
+                    // Lecture initiale
+                    const val = await battChar.readValue();
+                    updateBattUI(val.getUint8(0));
+                } catch(e) { console.log("Pas de batterie détectée"); }
+
                 const btn = document.getElementById('connectBtn');
                 btn.innerText = "Connecté ✅";
                 btn.style.background = "#1e1e1e";
                 btn.style.border = "1px solid #333";
             } catch(e) { console.log(e); }
+        }
+
+        function handleBattery(event) {
+            const value = event.target.value;
+            updateBattUI(value.getUint8(0));
+        }
+
+        function updateBattUI(percent) {
+            document.getElementById('batt-text').innerText = percent + "%";
+            document.getElementById('batt-fill').style.width = percent + "%";
+            // Changement de couleur si faible
+            if(percent < 20) document.getElementById('batt-fill').style.background = "red";
+            else document.getElementById('batt-fill').style.background = "#34c759";
         }
 
         async function send(data) { if(char) try { await char.writeValue(new Uint8Array(data)); } catch(e){} }
