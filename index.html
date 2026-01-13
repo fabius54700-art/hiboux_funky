@@ -28,9 +28,8 @@
 
         select { width: 100%; padding: 15px; border-radius: 15px; background: #3a3a3c; color: white; border: none; font-size: 16px; margin-top: 10px; -webkit-appearance: none; text-align: center; }
 
-        /* NOUVEAU STYLE LIEN CLIQUABLE */
         .link-box { 
-            display: block; /* Important pour que le lien prenne toute la largeur */
+            display: block; 
             background: rgba(0,0,0,0.4); 
             padding: 15px; 
             border-radius: 15px; 
@@ -38,7 +37,7 @@
             color: #888; 
             word-break: break-all; 
             margin-top: 10px; 
-            text-decoration: none; /* Pas de soulignement moche */
+            text-decoration: none; 
             border: 1px solid transparent;
             transition: 0.2s;
         }
@@ -74,7 +73,7 @@
                     <div class="dot" style="background:cyan" onclick="setPreset(2)"></div>
                     <div class="dot" style="background:yellow" onclick="setPreset(3)"></div>
                     <div class="dot" style="background:purple" onclick="setPreset(4)"></div>
-                    <div class="dot" style="background:blue" onclick="setPreset(5)"></div>
+                    <div class="dot" style="background:#ffffff" onclick="setPreset(5)"></div>
                 </div>
             </div>
 
@@ -102,8 +101,6 @@
         let device, char, isOn = true;
 
         const currentUrl = window.location.href;
-        
-        // Configuration des liens cliquables
         const linkEl = document.getElementById('shareLink');
         const linkErr = document.getElementById('linkTextErr');
         
